@@ -1,0 +1,148 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "authorship_tag": "ABX9TyPg2UmB00d7pMSovfTGCl67"
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# InSAR Processing for Deformation Application"
+      ],
+      "metadata": {
+        "id": "xzDzw3kxqwTp"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "**LiCSBAS**\n",
+        "\n",
+        "LiCSBAS is an open-source package in Python and bash to carry out InSAR time series analysis using LiCSAR products (i.e., unwrapped interferograms and coherence) which are freely available on the COMET-LiCS web portal.\n",
+        "\n",
+        "Users can easily derive the time series and velocity of the displacement if sufficient LiCSAR products are available in the area of interest. LiCSBAS also contains visualization tools to interactively display the time series of displacement to help investigation and interpretation of the results."
+      ],
+      "metadata": {
+        "id": "pqLsBNalpSeB"
+      }
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 1,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "idv4xY3Ko7Hb",
+        "outputId": "89ef6dc2-7180-4de2-ec9b-150f46b02ae8"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "setting for Google Colab\n",
+            "extracting licsbas data\n",
+            "prerequisites loaded, thank you. Running in directory:\n",
+            "/content/022D_04826_121209\n",
+            "\u001b[1mdone\u001b[0m\n"
+          ]
+        }
+      ],
+      "source": [
+        "from IPython.display import Image\n",
+        "import sys, os\n",
+        "\n",
+        "# below is for the local jupyhub env - should not affect the binder version\n",
+        "os.environ['PATH'] = os.environ['PATH']+':/data/notebooks/repositories/LiCSBAS/bin'\n",
+        "import sys\n",
+        "sys.path.append('/data/notebooks/repositories/LiCSBAS/LiCSBAS_lib')\n",
+        "\n",
+        "# but in case of google colab, will need to install the whole repo\n",
+        "gcolab=False\n",
+        "try:\n",
+        "    ipystr = str(get_ipython())\n",
+        "    if 'google.colab' in ipystr:\n",
+        "        gcolab=True\n",
+        "except:\n",
+        "    print('not in jupyter?')\n",
+        "\n",
+        "if gcolab:\n",
+        "    print('setting for Google Colab')\n",
+        "    os.system('git clone --depth 1 https://github.com/comet-licsar/LiCSBAS')\n",
+        "    os.system('pip install cmcrameri')\n",
+        "    os.system('pip install rioxarray')\n",
+        "    os.system('pip install ipympl')\n",
+        "    # os.system('apt-get install -y gmt')\n",
+        "    # os.system('pip install pygmt')\n",
+        "    os.environ['PATH'] = os.environ['PATH']+':'+os.path.join(os.getcwd(), 'LiCSBAS/bin')\n",
+        "    os.environ['PYTHONPATH'] = os.environ['PYTHONPATH']+':'+os.path.join(os.getcwd(), 'LiCSBAS/LiCSBAS_lib')\n",
+        "    sys.path.append(os.path.join(os.getcwd(), 'LiCSBAS/bin'))\n",
+        "    sys.path.append(os.path.join(os.getcwd(), 'LiCSBAS/LiCSBAS_lib'))\n",
+        "\n",
+        "import warnings\n",
+        "warnings.filterwarnings('ignore')\n",
+        "\n",
+        "# some extra functions\n",
+        "def display(png):\n",
+        "    if not os.path.exists(png):\n",
+        "        print('This png file does not exist, recheck please')\n",
+        "    else:\n",
+        "        return Image(png)\n",
+        "\n",
+        "def printbold(instr='done'):\n",
+        "    print('\\033[1m' + instr + '\\033[0m')\n",
+        "\n",
+        "# selected frame\n",
+        "frame = '022D_04826_121209' # for tutorial\n",
+        "\n",
+        "# Once you identified the frame ID to process and confirmed that\n",
+        "# the sufficient interferograms are available on the frame,\n",
+        "# make a processing directory and change to the directory\n",
+        "if os.path.exists('GEOCml2GACOS'):\n",
+        "    framedir = os.getcwd()\n",
+        "else:\n",
+        "    framedir = os.path.join(os.getcwd(),frame)\n",
+        "\n",
+        "if not os.path.exists(framedir):\n",
+        "    try:\n",
+        "        os.mkdir(framedir)\n",
+        "    except:\n",
+        "        framedir = os.path.join(os.environ['HOME'],frame)\n",
+        "        os.mkdir(framedir)\n",
+        "\n",
+        "os.chdir(framedir)\n",
+        "\n",
+        "# the files should have already been extracted if you run through binder\n",
+        "if not os.path.exists('GEOCml2GACOS'):\n",
+        "    print('extracting licsbas data')\n",
+        "    if gcolab:\n",
+        "        os.system('wget https://gitlab.com/comet_licsar/licsbas/-/raw/50255b48440479c35f5ffe65bbbf93795af25f73/tutorial/022D_04826_121209_ml2gacosclip.7z')\n",
+        "        os.system('wget https://gitlab.com/comet_licsar/licsbas/-/raw/50255b48440479c35f5ffe65bbbf93795af25f73/tutorial/022D_04826_121209_TS_result.7z')\n",
+        "        os.system('7za x 022D_04826_121209_ml2gacosclip.7z; rm 022D_04826_121209_ml2gacosclip.7z')\n",
+        "        #os.system('rm -rf TS*; 7za x 022D_04826_121209_TS_result.7z; rm 022D_04826_121209_TS_result.7z')\n",
+        "    else:\n",
+        "        os.system('7za x /data/notebooks/COMET_InSAR_Workshop_2024/Day2_LiCSBAS/tutorial.7z')\n",
+        "        # if needed, find here results of time series only:\n",
+        "        # os.system('7za x /data/notebooks/COMET_InSAR_Workshop_2024/Day2_LiCSBAS/tutorialts.7z')\n",
+        "\n",
+        "\n",
+        "print('prerequisites loaded, thank you. Running in directory:')\n",
+        "print(os.getcwd())\n",
+        "\n",
+        "printbold()"
+      ]
+    }
+  ]
+}
